@@ -92,6 +92,17 @@ class HyperLogLogPresto {
   uint64_t cardinality_;
 
   // TODO(student) - can add more data structures as required
+
+  /** @brief return right most one position*/
+  auto PositionOfRightmostOne(bustub::hash_t hash_value) -> uint8_t;
+
+  /** @brief return right most one position*/
+  auto getWholeNumber(int64_t idx) -> uint8_t;
+
+  /**  @brief leading bits*/
+  int16_t n_leading_bits_{};
+
+  bool hasStarted = false;
 };
 
 }  // namespace bustub
