@@ -16,6 +16,8 @@
 #include <list>
 #include <mutex>  // NOLINT
 #include <optional>
+#include <queue>
+#include <utility>
 #include <unordered_map>
 #include <vector>
 
@@ -26,9 +28,11 @@
 namespace bustub {
 
 class LRUKNode {
- private:
+ public:
   /** History of last seen K timestamps of this page. Least recent timestamp stored in front. */
   // Remove maybe_unused if you start using them. Feel free to change the member variables as you want.
+
+  explicit LRUKNode(size_t k, frame_id_t fid) : k_{k}, fid_{fid} {}
 
   [[maybe_unused]] std::list<size_t> history_;
   [[maybe_unused]] size_t k_;
