@@ -41,6 +41,37 @@ struct DiskRequest {
 
   /** Callback used to signal to the request issuer when the request has been completed. */
   std::promise<bool> callback_;
+  
+  /** @remarks added constructor and move semantics not included originally   */
+  DiskRequest(bool is_write, char *data, page_id_t page_id, std::promise<bool> callback)
+      : is_write_{is_write}, data_{data}, page_id_{page_id}, callback_{std::move(callback)} {}
+
+  DiskRequest(DiskRequest &&victim) noexcept
+      : is_write_{victim.is_write_},
+        data_{victim.data_},
+        page_id_{victim.page_id_},
+        callback_{std::move(victim.callback_)} {
+    victim.data_ = nullptr;
+  }
+
+  DiskRequest &operator=(DiskRequest &&victim) noexcept {
+    if (this == (&victim)) {
+      return *this;
+    }
+
+    is_write_ = victim.is_write_;
+    data_ = victim.data_;
+    page_id_ = victim.page_id_;
+    callback_ = std::move(victim.callback_);
+
+    victim.data_ = nullptr;
+
+    return *this;
+  }
+
+  /** @remarks delete copy semantics */
+  DiskRequest(const DiskRequest &) = delete;
+  DiskRequest &operator=(const DiskRequest &) = delete;
 };
 
 /**
@@ -86,5 +117,7 @@ class DiskScheduler {
   Channel<std::optional<DiskRequest>> request_queue_;
   /** The background thread responsible for issuing scheduled requests to the disk manager. */
   std::optional<std::thread> background_thread_;
+  /** mutex for Get and Put operation on channel */
+  std::mutex mtx;
 };
 }  // namespace bustub
