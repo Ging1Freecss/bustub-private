@@ -81,14 +81,19 @@ void DiskScheduler::StartWorkerThread() {
     if (arg.has_value()) {
       auto &[is_write_, data_, page_id_, callback_] = arg.value();
 
-      switch (is_write_) {
-        case true:
-          this->disk_manager_->WritePage(page_id_, data_);
-          break;
+      try {
+        switch (is_write_) {
+          case true:
+            this->disk_manager_->WritePage(page_id_, data_);
+            break;
 
-        case false:
-          this->disk_manager_->ReadPage(page_id_, data_);
-          break;
+          case false:
+            this->disk_manager_->ReadPage(page_id_, data_);
+            break;
+        }
+      } catch (...) {
+        callback_.set_value(false);
+        return;
       }
       callback_.set_value(true);
 

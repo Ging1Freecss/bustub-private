@@ -81,12 +81,12 @@ auto LRUKReplacer::Evict() -> std::optional<frame_id_t> {
   }
 
   if (lessThan_k.exist) {
-    Remove(lessThan_k.frame_id);
+    UnsafeRemove(lessThan_k.frame_id);
     return std::optional<frame_id_t>{lessThan_k.frame_id};
   }
 
   if (equalTo_k.exist) {
-    Remove(equalTo_k.frame_id);
+    UnsafeRemove(equalTo_k.frame_id);
     return std::optional<frame_id_t>{equalTo_k.frame_id};
   }
 
@@ -176,15 +176,32 @@ void LRUKReplacer::SetEvictable(frame_id_t frame_id, bool set_evictable) {
  *
  * @param frame_id id of frame to be removed
  */
-void LRUKReplacer::Remove(frame_id_t frame_id) {
+auto LRUKReplacer::Remove(frame_id_t frame_id) -> bool {
+  std::lock_guard lk{latch_};
   auto it = node_store_.find(frame_id);
 
-  BUSTUB_ASSERT(it != node_store_.end(), "frame id is invalid");
+  if(it == node_store_.end()) return false;
 
-  if (!it->second.is_evictable_) return;
+  if (!it->second.is_evictable_) return false;
 
   node_store_.erase(it);
   curr_size_--;
+
+  return true;
+}
+
+auto LRUKReplacer::UnsafeRemove(frame_id_t frame_id) -> bool {
+  
+  auto it = node_store_.find(frame_id);
+
+  if (it == node_store_.end()) return false;
+
+  if (!it->second.is_evictable_) return false;
+
+  node_store_.erase(it);
+  curr_size_--;
+
+  return true;
 }
 
 /**

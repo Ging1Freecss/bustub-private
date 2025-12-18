@@ -55,7 +55,7 @@ TEST(HyperLogLogTest, BasicTest1) {
   ASSERT_EQ(ans, 6);
 }
 
-TEST(HyperLogLogTest,BasicTest2) {
+TEST(HyperLogLogTest, BasicTest2) {
   auto obj = HyperLogLog<int64_t>(static_cast<int16_t>(3));
 
   ASSERT_EQ(obj.GetCardinality(), 0);

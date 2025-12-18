@@ -17,8 +17,8 @@
 #include <mutex>  // NOLINT
 #include <optional>
 #include <queue>
-#include <utility>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "buffer/arc_replacer.h"
@@ -70,10 +70,11 @@ class LRUKReplacer {
 
   void SetEvictable(frame_id_t frame_id, bool set_evictable);
 
-  void Remove(frame_id_t frame_id);
+  auto Remove(frame_id_t frame_id) -> bool;
 
   auto Size() -> size_t;
-
+   
+  auto UnsafeRemove(frame_id_t frame_id) -> bool;
  private:
   // TODO(student): implement me! You can replace these member variables as you like.
   // Remove maybe_unused if you start using them.

@@ -41,7 +41,7 @@ struct DiskRequest {
 
   /** Callback used to signal to the request issuer when the request has been completed. */
   std::promise<bool> callback_;
-  
+
   /** @remarks added constructor and move semantics not included originally   */
   DiskRequest(bool is_write, char *data, page_id_t page_id, std::promise<bool> callback)
       : is_write_{is_write}, data_{data}, page_id_{page_id}, callback_{std::move(callback)} {}
@@ -98,7 +98,7 @@ class DiskScheduler {
    *
    * @return std::promise<bool>
    */
-  auto CreatePromise() -> DiskSchedulerPromise { return {}; };
+  auto CreatePromise() -> DiskSchedulerPromise { return DiskSchedulerPromise{}; }
 
   /**
    * @brief Deallocates a page on disk.
