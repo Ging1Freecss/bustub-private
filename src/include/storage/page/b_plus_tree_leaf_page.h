@@ -12,6 +12,7 @@
 
 #pragma once
 
+#include <cmath>
 #include <string>
 #include <utility>
 #include <vector>
@@ -74,12 +75,22 @@ class BPlusTreeLeafPage : public BPlusTreePage {
   void SetNextPageId(page_id_t next_page_id);
   auto KeyAt(int index) const -> KeyType;
 
+  auto Split(BPlusTreeLeafPage<KeyType, ValueType, KeyComparator, NumTombs> *receiver, const page_id_t &rPage_Id)
+      -> KeyType;
+  void InsertElement(const KeyType &key, const ValueType &value, const KeyComparator &comparator);
+  auto Lookup(const KeyType &key, const KeyComparator &comparator) const -> std::optional<ValueType>;
+  void DeletePair(int idx);
+  auto ValueAt(int index) const -> ValueType;
+  void Merge(B_PLUS_TREE_LEAF_PAGE_TYPE *donor);
+  auto DeleteKey(const KeyType &key, KeyComparator comparator_) -> bool;
+  auto KeyPos(const KeyType &key, KeyComparator comparator_) const -> int;
   /**
    * @brief for test only return a string representing all keys in
    * this leaf page formatted as "(tombkey1, tombkey2, ...|key1,key2,key3,...)"
    *
    * @return std::string
    */
+
   auto ToString() const -> std::string {
     std::string kstr = "(";
     bool first = true;

@@ -64,10 +64,10 @@ ReadPageGuard::ReadPageGuard(ReadPageGuard &&that) noexcept
       frame_{std::move(that.frame_)},
       replacer_{std::move(that.replacer_)},
       bpm_latch_{std::move(that.bpm_latch_)},
-      disk_scheduler_{std::move(that.disk_scheduler_)} {
+      disk_scheduler_{std::move(that.disk_scheduler_)},
+      is_valid_{that.is_valid_} {
   that.page_id_ = INVALID_PAGE_ID;
   that.is_valid_ = false;
-  this->is_valid_ = true;
 }
 
 /**
@@ -168,7 +168,7 @@ void ReadPageGuard::Flush() {
  * TODO(P1): Add implementation.
  */
 void ReadPageGuard::Drop() {
-  if (!is_valid_) return;
+  if (!is_valid_ || (frame_ == nullptr)) return;
 
   frame_->rwlatch_.unlock_shared();
   std::scoped_lock<std::mutex> lk_bpm{*bpm_latch_};
@@ -235,10 +235,10 @@ WritePageGuard::WritePageGuard(WritePageGuard &&that) noexcept
       frame_{std::move(that.frame_)},
       replacer_{std::move(that.replacer_)},
       bpm_latch_{std::move(that.bpm_latch_)},
-      disk_scheduler_{std::move(that.disk_scheduler_)} {
+      disk_scheduler_{std::move(that.disk_scheduler_)},
+      is_valid_{that.is_valid_} {
   that.page_id_ = INVALID_PAGE_ID;
   that.is_valid_ = false;
-  this->is_valid_ = true;
 }
 
 /**
@@ -262,7 +262,7 @@ auto WritePageGuard::operator=(WritePageGuard &&that) noexcept -> WritePageGuard
   if (this == (&that)) {
     return *this;
   }
-  this->Drop(); // drop the current resource held by this
+  this->Drop();  // drop the current resource held by this
   page_id_ = that.page_id_;
   frame_ = std::move(that.frame_);
   replacer_ = std::move(that.replacer_);
@@ -288,7 +288,7 @@ auto WritePageGuard::GetPageId() const -> page_id_t {
  */
 auto WritePageGuard::GetData() const -> const char * {
   BUSTUB_ENSURE(is_valid_, "tried to use an invalid write guard");
-  
+
   return frame_->GetData();
 }
 
@@ -297,7 +297,8 @@ auto WritePageGuard::GetData() const -> const char * {
  */
 auto WritePageGuard::GetDataMut() -> char * {
   BUSTUB_ENSURE(is_valid_, "tried to use an invalid write guard");
-  frame_->is_dirty_ = true; // really really important, as when cailling this func , mean the prog explictly want to modify
+  frame_->is_dirty_ =
+      true;  // really really important, as when cailling this func , mean the prog explictly want to modify
   return frame_->GetDataMut();
 }
 

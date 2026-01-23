@@ -72,7 +72,7 @@ BufferPoolManager::BufferPoolManager(size_t num_frames, DiskManager *disk_manage
     : num_frames_(num_frames),
       next_page_id_(0),
       bpm_latch_(std::make_shared<std::mutex>()),
-      replacer_(std::make_shared<LRUKReplacer>(num_frames,2)),
+      replacer_(std::make_shared<LRUKReplacer>(num_frames, 2)),
       disk_scheduler_(std::make_shared<DiskScheduler>(disk_manager)),
       log_manager_(log_manager) {
   // Not strictly necessary...
@@ -131,7 +131,11 @@ auto BufferPoolManager::ClaimFrame() -> std::optional<frame_id_t> {
       input.push_back(std::move(disk_rq));
       disk_scheduler_->Schedule(input);
 
-      if (!fr.get()) return std::nullopt;
+      if (!fr.get()) {
+        replacer_->RecordAccess(opt_fid.value());
+        replacer_->SetEvictable(opt_fid.value(), true);
+        return std::nullopt;
+      }
 
       victim_ptr->is_dirty_ = false;
     }
@@ -172,7 +176,7 @@ auto BufferPoolManager::NewPage() -> page_id_t {
   page_table_.insert({page_id, fid});
 
   replacer_->RecordAccess(fid);
-  replacer_->SetEvictable(fid, true);
+  replacer_->SetEvictable(fid, false);
 
   return page_id;
 }
@@ -198,20 +202,20 @@ auto BufferPoolManager::NewPage() -> page_id_t {
  */
 auto BufferPoolManager::DeletePage(page_id_t page_id) -> bool {
   std::lock_guard lk{*bpm_latch_};
-  if(page_id == INVALID_PAGE_ID) return false;
+  if (page_id == INVALID_PAGE_ID) return false;
 
   auto it = page_table_.find(page_id);
 
-  if(it == page_table_.end()) return true; // already deleted
+  if (it == page_table_.end()) return true;  // already deleted
 
   frame_id_t fid{it->second};
   std::shared_ptr<FrameHeader> frame_ptr{frames_[fid]};
 
-  if(frame_ptr->pin_count_ > 0) return false;
+  if (frame_ptr->pin_count_ > 0) return false;
 
   bool status = replacer_->Remove(fid);
-  
-  if(!status) return false;
+
+  if (!status) return false;
   page_table_.erase(page_id);
 
   frame_ptr->Reset();
@@ -524,7 +528,7 @@ auto BufferPoolManager::FlushPageUnsafe(page_id_t page_id) -> bool {
  * @param page_id The page ID of the page to be flushed.
  * @return `false` if the page could not be found in the page table; otherwise, `true`.
  */
-auto BufferPoolManager::FlushPage(page_id_t page_id) -> bool { 
+auto BufferPoolManager::FlushPage(page_id_t page_id) -> bool {
   std::lock_guard lk{*bpm_latch_};
   return FlushPageUnsafe(page_id);
 }
@@ -542,8 +546,8 @@ auto BufferPoolManager::FlushPage(page_id_t page_id) -> bool {
  *
  * TODO(P1): Add implementation
  */
-void BufferPoolManager::FlushAllPagesUnsafe() { 
-  for(auto& [page_id,frame_id] : page_table_){
+void BufferPoolManager::FlushAllPagesUnsafe() {
+  for (auto &[page_id, frame_id] : page_table_) {
     FlushPageUnsafe(page_id);
   }
 }
@@ -560,7 +564,7 @@ void BufferPoolManager::FlushAllPagesUnsafe() {
  *
  * TODO(P1): Add implementation
  */
-void BufferPoolManager::FlushAllPages() { 
+void BufferPoolManager::FlushAllPages() {
   std::lock_guard lk{*bpm_latch_};
   FlushAllPagesUnsafe();
 }
@@ -594,8 +598,8 @@ auto BufferPoolManager::GetPinCount(page_id_t page_id) -> std::optional<size_t> 
 
   auto it = page_table_.find(page_id);
 
-  if(it == page_table_.end()) return std::nullopt;
-  
+  if (it == page_table_.end()) return std::nullopt;
+
   frame_id_t fid = it->second;
   std::shared_ptr<FrameHeader> frame_ptr = frames_[fid];
 

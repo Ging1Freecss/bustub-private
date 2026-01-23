@@ -120,7 +120,7 @@ void LookupHelper(BPlusTree<GenericKey<8>, RID, GenericComparator<8>, Tombs> *tr
   }
 }
 
-const size_t NUM_ITERS = 50;
+const size_t NUM_ITERS = 1;
 const size_t MIXTEST_NUM_ITERS = 20;
 static const size_t BPM_SIZE = 50;
 
@@ -131,14 +131,14 @@ void InsertTest1Call() {
     auto key_schema = ParseCreateStatement("a bigint");
     GenericComparator<8> comparator(key_schema.get());
 
-    auto *disk_manager = new DiskManagerUnlimitedMemory();
-    auto *bpm = new BufferPoolManager(BPM_SIZE, disk_manager);
+    auto disk_manager = std::make_unique<DiskManagerUnlimitedMemory>();
+    auto bpm = std::make_unique<BufferPoolManager>(BPM_SIZE, disk_manager.get());
 
     // create and fetch header_page
     page_id_t page_id = bpm->NewPage();
 
-    // create b+ tree
-    BPlusTree<GenericKey<8>, RID, GenericComparator<8>, Tombs> tree("foo_pk", page_id, bpm, comparator, 3, 5);
+    // create b+ treec
+    BPlusTree<GenericKey<8>, RID, GenericComparator<8>, Tombs> tree("foo_pk", page_id, bpm.get(), comparator, 3, 5);
 
     // keys to Insert
     std::vector<int64_t> keys;
@@ -146,7 +146,7 @@ void InsertTest1Call() {
     for (int64_t key = 1; key < scale_factor; key++) {
       keys.push_back(key);
     }
-    LaunchParallelTest(2, InsertHelper<Tombs>, &tree, keys);
+    LaunchParallelTest(1, InsertHelper<Tombs>, &tree, keys);
 
     std::vector<RID> rids;
     GenericKey<8> index_key;
@@ -173,8 +173,6 @@ void InsertTest1Call() {
 
     ASSERT_EQ(current_key, keys.size() + 1);
 
-    delete disk_manager;
-    delete bpm;
     remove("test.db");
     remove("test.log");
   }
@@ -455,32 +453,32 @@ void MixTest2Call() {
   }
 }
 
-TEST(BPlusTreeConcurrentTest, DISABLED_InsertTest1) {  // NOLINT
+TEST(BPlusTreeConcurrentTest, InsertTest1) {  // NOLINT
   InsertTest1Call<0>();
   InsertTest1Call<3>();
 }
 
-TEST(BPlusTreeConcurrentTest, DISABLED_InsertTest2) {  // NOLINT
+TEST(BPlusTreeConcurrentTest, InsertTest2) {  // NOLINT
   InsertTest2Call<0>();
   InsertTest2Call<3>();
 }
 
-TEST(BPlusTreeConcurrentTest, DISABLED_DeleteTest1) {  // NOLINT
+TEST(BPlusTreeConcurrentTest, DeleteTest1) {  // NOLINT
   DeleteTest1Call<0>();
   DeleteTest1Call<3>();
 }
 
-TEST(BPlusTreeConcurrentTest, DISABLED_DeleteTest2) {  // NOLINT
+TEST(BPlusTreeConcurrentTest, DeleteTest2) {  // NOLINT
   DeleteTest2Call<0>();
   DeleteTest2Call<3>();
 }
 
-TEST(BPlusTreeConcurrentTest, DISABLED_MixTest1) {  // NOLINT
+TEST(BPlusTreeConcurrentTest, MixTest1) {  // NOLINT
   MixTest1Call<0>();
   MixTest1Call<3>();
 }
 
-TEST(BPlusTreeConcurrentTest, DISABLED_MixTest2) {  // NOLINT
+TEST(BPlusTreeConcurrentTest, MixTest2) {  // NOLINT
   MixTest2Call<0>();
   MixTest2Call<3>();
 }

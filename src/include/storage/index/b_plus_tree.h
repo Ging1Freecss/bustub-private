@@ -75,13 +75,15 @@ class Context {
 FULL_INDEX_TEMPLATE_ARGUMENTS_DEFN
 class BPlusTree {
   using InternalPage = BPlusTreeInternalPage<KeyType, page_id_t, KeyComparator>;
-  using LeafPage = BPlusTreeLeafPage<KeyType, ValueType, KeyComparator>;
+  using LeafPage = BPlusTreeLeafPage<KeyType, ValueType, KeyComparator, NumTombs>;
 
  public:
   explicit BPlusTree(std::string name, page_id_t header_page_id, BufferPoolManager *buffer_pool_manager,
                      const KeyComparator &comparator, int leaf_max_size = LEAF_PAGE_SLOT_CNT,
                      int internal_max_size = INTERNAL_PAGE_SLOT_CNT);
 
+  enum class Mode { Insert, Delete };
+  enum class DeleteOperation { Borrow, Merge, None };
   // Returns true if this B+ tree has no keys and values.
   auto IsEmpty() const -> bool;
 
@@ -110,6 +112,10 @@ class BPlusTree {
 
   auto DrawBPlusTree() -> std::string;
 
+  auto FindLeafPessimistic(const KeyType &key, Context &ctx, Mode mode) -> std::optional<WritePageGuard>;
+
+  void SplitInternalPage(const KeyType &key, const page_id_t &page_id, Context &ctx);
+
   // read data from file and insert one by one
   void InsertFromFile(const std::filesystem::path &file_name);
 
@@ -127,6 +133,18 @@ class BPlusTree {
   void PrintTree(page_id_t page_id, const BPlusTreePage *page);
 
   auto ToPrintableBPlusTree(page_id_t root_id) -> PrintableBPlusTree;
+
+  // for leaf and internal page
+  void MergeInternalPage(InternalPage *parent, InternalPage *node1, InternalPage *node2, int node1_idx, int node2_idx);
+  void MergeLeafPage(InternalPage *parent, LeafPage *node1, LeafPage *node2, int node1_idx, int node2_idx);
+  void BorrowInternalPage(InternalPage *parent, InternalPage *donor, InternalPage *receiver, int d_idx, int r_idx);
+  void BorrowLeafPage(InternalPage *parent, LeafPage *donor, LeafPage *receiver, int d_idx, int r_idx);
+  auto FixedLeafAfterDelete(InternalPage *parent, LeafPage *child, int child_idx, page_id_t child_pid)
+      -> std::pair<page_id_t, DeleteOperation>;
+  void FixedInternalAfterDelete(std::optional<WritePageGuard> &&, InternalPage *child, Context &ctx);
+
+  // for optimistic searching
+  auto FindLeafOptimistic(const KeyType &key, Context &ctx, Mode mode) -> std::optional<ReadPageGuard>;
 
   // member variable
   std::string index_name_;

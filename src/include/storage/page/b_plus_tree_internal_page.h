@@ -60,17 +60,29 @@ class BPlusTreeInternalPage : public BPlusTreePage {
    * @param value The value to search for
    * @return The index that corresponds to the specified value
    */
-  auto ValueIndex(const ValueType &value) const -> int;
+  auto ValueIndex(const ValueType &value, KeyComparator comparator) const -> int;
 
   auto ValueAt(int index) const -> ValueType;
 
-  /**
-   * @brief For test only, return a string representing all keys in
-   * this internal page, formatted as "(key1,key2,key3,...)"
-   *
-   * @return The string representation of all keys in the current internal page
-   */
-  auto ToString() const -> std::string {
+  auto Lookup(const KeyType &key, const KeyComparator comparator) const -> ValueType;
+
+  auto MoveHalfTo(BPlusTreeInternalPage<KeyType, ValueType, KeyComparator> *receiver, const KeyType &key,
+                  const ValueType &value, const KeyComparator comparator_) -> KeyType;
+
+  void SetValueAt(int index, const ValueType &value);
+
+  void InsertElement(const KeyType &key, const ValueType &, const KeyComparator comparator);
+
+  void Merge(B_PLUS_TREE_INTERNAL_PAGE_TYPE* donor,KeyType middleKey);
+  void DeletePair(int idx);
+
+      /**
+       * @brief For test only, return a string representing all keys in
+       * this internal page, formatted as "(key1,key2,key3,...)"
+       *
+       * @return The string representation of all keys in the current internal page
+       */
+      auto ToString() const -> std::string {
     std::string kstr = "(";
     bool first = true;
 
