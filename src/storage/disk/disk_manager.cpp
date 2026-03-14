@@ -12,6 +12,7 @@
 
 #include <sys/stat.h>
 #include <cassert>
+#include <cstddef>
 #include <cstring>
 #include <iostream>
 #include <mutex>  // NOLINT
@@ -118,7 +119,7 @@ void DiskManager::ReadPage(page_id_t page_id, char *page_data) {
   }
 
   // Check if we have read beyond the file length.
-  int file_size = GetFileSize(db_file_name_);
+  int64_t file_size = GetFileSize(db_file_name_);
   if (file_size < 0) {
     LOG_DEBUG("I/O error: Fail to get db file size");
     return;
@@ -162,7 +163,7 @@ void DiskManager::DeletePage(page_id_t page_id) {
   size_t offset = pages_[page_id];
   free_slots_.push_back(offset);
   pages_.erase(page_id);
-  num_deletes_ += 1;
+  num_deletes_++;
 }
 
 /**
@@ -187,7 +188,7 @@ void DiskManager::WriteLog(char *log_data, int size) {
     assert(flush_log_f_->wait_for(std::chrono::seconds(10)) == std::future_status::ready);
   }
 
-  num_flushes_ += 1;
+  num_flushes_++;
   // sequence write
   log_io_.write(log_data, size);
 
@@ -210,12 +211,12 @@ void DiskManager::WriteLog(char *log_data, int size) {
  * @return true if the read was successful, false otherwise
  */
 auto DiskManager::ReadLog(char *log_data, int size, int offset) -> bool {
-  if (offset >= GetFileSize(log_file_name_)) {
+  if (offset >= static_cast<int64_t>(GetFileSize(log_file_name_))) {
     // LOG_DEBUG("end of log file");
     // LOG_DEBUG("file size is %d", GetFileSize(log_name_));
     return false;
   }
-  log_io_.seekp(offset);
+  log_io_.seekg(offset);
   log_io_.read(log_data, size);
 
   if (log_io_.bad()) {
@@ -233,24 +234,24 @@ auto DiskManager::ReadLog(char *log_data, int size, int offset) -> bool {
 }
 
 /** @return the number of disk flushes */
-auto DiskManager::GetNumFlushes() const -> int { return num_flushes_; }
+auto DiskManager::GetNumFlushes() const -> int64_t { return num_flushes_; }
 
 /** @return true iff the in-memory content has not been flushed yet */
 auto DiskManager::GetFlushState() const -> bool { return flush_log_; }
 
 /** @return the number of disk writes */
-auto DiskManager::GetNumWrites() const -> int { return num_writes_; }
+auto DiskManager::GetNumWrites() const -> int64_t { return num_writes_; }
 
 /** @return the number of deletions */
-auto DiskManager::GetNumDeletes() const -> int { return num_deletes_; }
+auto DiskManager::GetNumDeletes() const -> int64_t { return num_deletes_; }
 
 /**
  * Private helper function to get disk file size
  */
-auto DiskManager::GetFileSize(const std::string &file_name) -> int {
+auto DiskManager::GetFileSize(const std::string &file_name) -> int64_t {
   struct stat stat_buf;
   int rc = stat(file_name.c_str(), &stat_buf);
-  return rc == 0 ? static_cast<int>(stat_buf.st_size) : -1;
+  return rc == 0 ? static_cast<int64_t>(stat_buf.st_size) : -1;
 }
 
 /**
@@ -268,7 +269,7 @@ auto DiskManager::AllocatePage() -> size_t {
   // Increase the file size if necessary.
   if (pages_.size() + 1 >= page_capacity_) {
     page_capacity_ *= 2;
-    std::filesystem::resize_file(db_file_name_, (page_capacity_ + 1) * BUSTUB_PAGE_SIZE);
+    std::filesystem::resize_file(db_file_name_, (page_capacity_ + 1) * static_cast<size_t>(BUSTUB_PAGE_SIZE));
   }
   return pages_.size() * BUSTUB_PAGE_SIZE;
 }

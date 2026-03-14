@@ -125,7 +125,6 @@ void B_PLUS_TREE_LEAF_PAGE_TYPE::InsertElement(const KeyType &key, const ValueTy
   key_array_[i] = key;
   rid_array_[i] = value;
 
-  
   ChangeSizeBy(1);
 }
 
@@ -166,7 +165,6 @@ auto B_PLUS_TREE_LEAF_PAGE_TYPE::Split(BPlusTreeLeafPage<KeyType, ValueType, Key
 
   receiver->SetNextPageId(next_page_id_);
   SetNextPageId(rPage_Id);
-
 
   return middleKey;
 }

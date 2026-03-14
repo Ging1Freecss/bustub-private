@@ -18,6 +18,7 @@
 #include "catalog/schema.h"
 #include "common/config.h"
 #include "common/rid.h"
+// #include "storage/page/intermediate_result_page.h"
 #include "type/value.h"
 
 namespace bustub {
@@ -52,6 +53,7 @@ class Tuple {
   friend class TablePage;
   friend class TableHeap;
   friend class TableIterator;
+  friend class IntermediateResultPage;
 
  public:
   // Default constructor (to create a dummy tuple)

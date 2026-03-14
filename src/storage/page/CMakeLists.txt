@@ -11,6 +11,7 @@ add_library(
     extendible_htable_directory_page.cpp
     extendible_htable_header_page.cpp
     extendible_htable_page_utils.cpp
+    intermediate_result_page.cpp
     page_guard.cpp
     table_page.cpp)
 

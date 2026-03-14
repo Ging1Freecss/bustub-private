@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "type/type.h"
+#include <cstdint>
 #include <string>
 #include "common/exception.h"
 #include "type/bigint_type.h"
@@ -189,7 +191,29 @@ auto Type::GetMaxValue(TypeId type_id) -> Value {
 
 auto Type::CompareEquals(const Value &left __attribute__((unused)), const Value &right __attribute__((unused))) const
     -> CmpBool {
-  throw NotImplementedException("CompareEquals not implemented");
+  if (left.type_id_ != right.type_id_) {
+    return CmpBool::CmpFalse;
+  }
+
+  switch (left.type_id_) {
+    case BOOLEAN:
+      return (left.value_.boolean_ == right.value_.boolean_) ? CmpBool::CmpTrue : CmpBool::CmpFalse;
+    case TINYINT:
+      return (left.value_.tinyint_ == right.value_.tinyint_) ? CmpBool::CmpTrue : CmpBool::CmpFalse;
+    case SMALLINT:
+      return (left.value_.smallint_ == right.value_.smallint_) ? CmpBool::CmpTrue : CmpBool::CmpFalse;
+    case INTEGER:
+      return (left.value_.integer_ == right.value_.integer_) ? CmpBool::CmpTrue : CmpBool::CmpFalse;
+    case BIGINT:
+      return (left.value_.bigint_ == right.value_.bigint_) ? CmpBool::CmpTrue : CmpBool::CmpFalse;
+    case DECIMAL:
+      return (left.value_.decimal_ == right.value_.decimal_) ? CmpBool::CmpTrue : CmpBool::CmpFalse;
+    case TIMESTAMP:
+      return (left.value_.timestamp_ == right.value_.timestamp_) ? CmpBool::CmpTrue : CmpBool::CmpFalse;
+    default:
+      break;
+  }
+  throw Exception(ExceptionType::MISMATCH_TYPE, "Cannot compare value.");
 }
 
 auto Type::CompareNotEquals(const Value &left __attribute__((unused)), const Value &right __attribute__((unused))) const
@@ -215,8 +239,27 @@ auto Type::CompareGreaterThanEquals(const Value &left __attribute__((unused)),
 }
 
 // Other mathematical functions
-auto Type::Add(const Value &left __attribute__((unused)), const Value &right __attribute__((unused))) const -> Value {
-  throw NotImplementedException("Add not implemented");
+auto Type::Add(const Value &left, const Value &right) const -> Value {
+  if (left.type_id_ != right.type_id_) {
+    throw Exception(ExceptionType::MISMATCH_TYPE, "type mismatch");
+  }
+  switch (left.type_id_) {
+    case TINYINT:
+      return Value(left.type_id_, static_cast<int8_t>(left.value_.tinyint_ + right.value_.tinyint_));
+    case SMALLINT:
+      return Value(left.type_id_, static_cast<int16_t>(left.value_.smallint_ + right.value_.smallint_));
+    case INTEGER:
+      return Value(left.type_id_, static_cast<int32_t>(left.value_.integer_ + right.value_.integer_));
+    case BIGINT:
+      return Value(left.type_id_, static_cast<int64_t>(left.value_.bigint_ + right.value_.bigint_));
+    case DECIMAL:
+      return Value(left.type_id_, static_cast<double>(left.value_.decimal_ + right.value_.decimal_));
+    case TIMESTAMP:
+      return Value(left.type_id_, static_cast<uint64_t>(left.value_.timestamp_ + right.value_.timestamp_));
+    default:
+      break;
+  }
+  throw Exception(ExceptionType::INVALID, "Cannot add values of this type");
 }
 
 auto Type::Subtract(const Value &left __attribute__((unused)), const Value &right __attribute__((unused))) const
@@ -239,12 +282,52 @@ auto Type::Modulo(const Value &left __attribute__((unused)), const Value &right 
   throw NotImplementedException("Modulo not implemented");
 }
 
-auto Type::Min(const Value &left __attribute__((unused)), const Value &right __attribute__((unused))) const -> Value {
-  throw NotImplementedException("Min not implemented");
+auto Type::Min(const Value &left, const Value &right) const -> Value {
+  if (left.type_id_ != right.type_id_) {
+    throw Exception(ExceptionType::MISMATCH_TYPE, "type of left and right does not match");
+  }
+
+  switch (left.type_id_) {
+    case TINYINT:
+      return Value(left.type_id_, static_cast<int8_t>(std::min(left.value_.tinyint_, right.value_.tinyint_)));
+    case SMALLINT:
+      return Value(left.type_id_, static_cast<int16_t>(std::min(left.value_.smallint_, right.value_.smallint_)));
+    case INTEGER:
+      return Value(left.type_id_, static_cast<int32_t>(std::min(left.value_.integer_, right.value_.integer_)));
+    case BIGINT:
+      return Value(left.type_id_, static_cast<int64_t>(std::min(left.value_.bigint_, right.value_.bigint_)));
+    case DECIMAL:
+      return Value(left.type_id_, static_cast<double>(std::min(left.value_.decimal_, right.value_.decimal_)));
+    case TIMESTAMP:
+      return Value(left.type_id_, static_cast<uint64_t>(std::min(left.value_.timestamp_, right.value_.timestamp_)));
+    default:
+      break;
+  }
+  throw Exception(ExceptionType::INVALID, "Cannot add value of type you have provided");
 }
 
-auto Type::Max(const Value &left __attribute__((unused)), const Value &right __attribute__((unused))) const -> Value {
-  throw NotImplementedException("Max not implemented");
+auto Type::Max(const Value &left, const Value &right) const -> Value {
+  if (left.type_id_ != right.type_id_) {
+    throw Exception(ExceptionType::MISMATCH_TYPE, "type of left and right does not match");
+  }
+
+  switch (left.type_id_) {
+    case TINYINT:
+      return Value(left.type_id_, static_cast<int8_t>(std::max(left.value_.tinyint_, right.value_.tinyint_)));
+    case SMALLINT:
+      return Value(left.type_id_, static_cast<int16_t>(std::max(left.value_.smallint_, right.value_.smallint_)));
+    case INTEGER:
+      return Value(left.type_id_, static_cast<int32_t>(std::max(left.value_.integer_, right.value_.integer_)));
+    case BIGINT:
+      return Value(left.type_id_, static_cast<int64_t>(std::max(left.value_.bigint_, right.value_.bigint_)));
+    case DECIMAL:
+      return Value(left.type_id_, static_cast<double>(std::max(left.value_.decimal_, right.value_.decimal_)));
+    case TIMESTAMP:
+      return Value(left.type_id_, static_cast<uint64_t>(std::max(left.value_.timestamp_, right.value_.timestamp_)));
+    default:
+      break;
+  }
+  throw Exception(ExceptionType::INVALID, "Cannot add value of type you have provided");
 }
 
 auto Type::Sqrt(const Value &val __attribute__((unused))) const -> Value {

@@ -69,13 +69,13 @@ class DiskManager {
 
   auto ReadLog(char *log_data, int size, int offset) -> bool;
 
-  auto GetNumFlushes() const -> int;
+  auto GetNumFlushes() const -> int64_t;
 
   auto GetFlushState() const -> bool;
 
-  auto GetNumWrites() const -> int;
+  auto GetNumWrites() const -> int64_t;
 
-  auto GetNumDeletes() const -> int;
+  auto GetNumDeletes() const -> int64_t;
 
   /**
    * Sets the future which is used to check for non-blocking flushes.
@@ -100,15 +100,15 @@ class DiskManager {
   }
 
  protected:
-  int num_flushes_{0};
-  int num_writes_{0};
-  int num_deletes_{0};
+  uint64_t num_flushes_{0};
+  uint64_t num_writes_{0};
+  uint64_t num_deletes_{0};
 
   /** @brief The capacity of the file used for storage on disk. */
   size_t page_capacity_{DEFAULT_DB_IO_SIZE};
 
  private:
-  auto GetFileSize(const std::string &file_name) -> int;
+  auto GetFileSize(const std::string &file_name) -> int64_t;
 
   auto AllocatePage() -> size_t;
 

@@ -73,16 +73,16 @@ class BPlusTreeInternalPage : public BPlusTreePage {
 
   void InsertElement(const KeyType &key, const ValueType &, const KeyComparator comparator);
 
-  void Merge(B_PLUS_TREE_INTERNAL_PAGE_TYPE* donor,KeyType middleKey);
+  void Merge(B_PLUS_TREE_INTERNAL_PAGE_TYPE *donor, KeyType middleKey);
   void DeletePair(int idx);
 
-      /**
-       * @brief For test only, return a string representing all keys in
-       * this internal page, formatted as "(key1,key2,key3,...)"
-       *
-       * @return The string representation of all keys in the current internal page
-       */
-      auto ToString() const -> std::string {
+  /**
+   * @brief For test only, return a string representing all keys in
+   * this internal page, formatted as "(key1,key2,key3,...)"
+   *
+   * @return The string representation of all keys in the current internal page
+   */
+  auto ToString() const -> std::string {
     std::string kstr = "(";
     bool first = true;
 

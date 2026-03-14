@@ -11,19 +11,60 @@
 //===----------------------------------------------------------------------===//
 
 #include "execution/execution_common.h"
+#include <cassert>
+#include <cstddef>
 
+#include "binder/bound_order_by.h"
 #include "catalog/catalog.h"
 #include "common/macros.h"
 #include "concurrency/transaction_manager.h"
 #include "fmt/core.h"
 #include "storage/table/table_heap.h"
+#include "storage/table/tuple.h"
+#include "type/type.h"
+#include "type/value.h"
 
 namespace bustub {
 
 TupleComparator::TupleComparator(std::vector<OrderBy> order_bys) : order_bys_(std::move(order_bys)) {}
 
 /** TODO(P3): Implement the comparison method */
-auto TupleComparator::operator()(const SortEntry &entry_a, const SortEntry &entry_b) const -> bool { return false; }
+auto TupleComparator::operator()(const SortEntry &entry_a, const SortEntry &entry_b) const -> bool {
+  BUSTUB_ASSERT(entry_a.first.size() == entry_b.first.size() && order_bys_.size() == entry_a.first.size(),
+                "value array size are not equal");
+  const std::vector<bustub::Value> &values_a{entry_a.first};
+  const std::vector<bustub::Value> &values_b{entry_b.first};
+
+  for (size_t i{0}; i < order_bys_.size(); i++) {
+    OrderByType order_type{std::get<0>(order_bys_[i])};
+    OrderByNullType null_type{std::get<1>(order_bys_[i])};
+
+    const Value &val_a{values_a[i]};
+    const Value &val_b{values_b[i]};
+
+    bool is_asc{order_type == OrderByType::ASC || order_type == OrderByType::DEFAULT};
+    bool null_first{null_type == OrderByNullType::NULLS_FIRST};  // if null first then true else if null last then false
+
+    if (null_type == OrderByNullType::DEFAULT) {
+      null_first = is_asc;  // for default same as order by val
+    }
+
+    if (val_a.IsNull() && val_b.IsNull()) {
+      continue;
+    } else if (val_a.IsNull()) {
+      return null_first;  //  a is null -> a come first if we return true  -> null_first=true needed
+    } else if (val_b.IsNull()) {
+      return !null_first;  //  b is null -> b come first if we return false -> null_first = true needed
+    }
+
+    if (val_a.CompareLessThan(val_b) == CmpBool::CmpTrue) {
+      return is_asc;
+    } else if (val_a.CompareGreaterThan(val_b) == CmpBool::CmpTrue) {
+      return !is_asc;
+    }  // equal then go to next loop
+  }
+  return false;
+}
 
 /**
  * Generate sort key for a tuple based on the order by expressions.
@@ -31,7 +72,13 @@ auto TupleComparator::operator()(const SortEntry &entry_a, const SortEntry &entr
  * TODO(P3): Implement this method.
  */
 auto GenerateSortKey(const Tuple &tuple, const std::vector<OrderBy> &order_bys, const Schema &schema) -> SortKey {
-  return {};
+  SortKey values;
+
+  for (const OrderBy &ele : order_bys) {
+    const AbstractExpressionRef &expr = std::get<2>(ele);
+    values.push_back(expr->Evaluate(&tuple, schema));
+  }
+  return values;
 }
 
 /**

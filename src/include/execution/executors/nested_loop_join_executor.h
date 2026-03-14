@@ -12,7 +12,9 @@
 
 #pragma once
 
+#include <cstddef>
 #include <memory>
+#include <unordered_map>
 #include <vector>
 
 #include "execution/executor_context.h"
@@ -42,6 +44,27 @@ class NestedLoopJoinExecutor : public AbstractExecutor {
  private:
   /** The NestedLoopJoin plan node to be executed. */
   const NestedLoopJoinPlanNode *plan_;
+  std::unique_ptr<AbstractExecutor> left_executor_{nullptr};
+  std::unique_ptr<AbstractExecutor> right_executor_{nullptr};
+
+  // index of current batch
+  size_t left_idx_{0};
+  size_t right_idx_{0};
+
+  // return value of left_executor_->Next and right_executor_->Next
+  bool left_ele_exist_{false};
+  bool right_ele_exist_{false};
+
+  // current batch of values
+  std::vector<bustub::Tuple> tuple_batch_left{};
+  std::vector<bustub::Tuple> tuple_batch_right{};
+  std::vector<bustub::RID> rid_batch_left{};
+  std::vector<bustub::RID> rid_batch_right{};
+
+  // use for left join when left tuple match with no right tuple
+  std::vector<bool> left_matched_{};
+  std::vector<Tuple> left_matched_arr_{};
+  size_t left_matched_idx_{0};
 };
 
 }  // namespace bustub

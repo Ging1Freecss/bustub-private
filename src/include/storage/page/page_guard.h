@@ -16,8 +16,8 @@
 #include <shared_mutex>
 
 #include "buffer/arc_replacer.h"
-#include "buffer/lru_k_replacer.h"
 #include "buffer/buffer_pool_manager.h"
+#include "buffer/lru_k_replacer.h"
 #include "storage/disk/disk_scheduler.h"
 #include "storage/page/page.h"
 
@@ -140,7 +140,6 @@ class ReadPageGuard {
 class WritePageGuard {
   /** @brief Only the buffer pool manager is allowed to construct a valid `WritePageGuard.` */
   friend class BufferPoolManager;
-
 
  public:
   /**

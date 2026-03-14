@@ -12,6 +12,8 @@
 
 #include "execution/executors/limit_executor.h"
 #include "common/macros.h"
+#include "common/rid.h"
+#include "storage/table/tuple.h"
 
 namespace bustub {
 
@@ -23,12 +25,14 @@ namespace bustub {
  */
 LimitExecutor::LimitExecutor(ExecutorContext *exec_ctx, const LimitPlanNode *plan,
                              std::unique_ptr<AbstractExecutor> &&child_executor)
-    : AbstractExecutor(exec_ctx) {
-  UNIMPLEMENTED("TODO(P3): Add implementation.");
-}
+    : AbstractExecutor(exec_ctx), plan_(plan), child_executor_(std::move(child_executor)) {}
 
 /** Initialize the limit */
-void LimitExecutor::Init() { UNIMPLEMENTED("TODO(P3): Add implementation."); }
+void LimitExecutor::Init() {
+  child_executor_->Init();
+  num_tuples = 0;
+  is_finished = false;
+}
 
 /**
  * Yield the next tuple batch from the limit.
@@ -39,7 +43,38 @@ void LimitExecutor::Init() { UNIMPLEMENTED("TODO(P3): Add implementation."); }
  */
 auto LimitExecutor::Next(std::vector<bustub::Tuple> *tuple_batch, std::vector<bustub::RID> *rid_batch,
                          size_t batch_size) -> bool {
-  UNIMPLEMENTED("TODO(P3): Add implementation.");
+  tuple_batch->clear();
+  rid_batch->clear();
+
+  if (is_finished) return false;
+
+  std::vector<Tuple> child_tuple{};
+  std::vector<RID> child_rid{};
+
+  while (child_executor_->Next(&child_tuple, &child_rid, batch_size)) {
+    if (num_tuples + child_tuple.size() <= plan_->GetLimit() && child_tuple.size() == batch_size) {
+      num_tuples += child_tuple.size();
+      (*tuple_batch) = std::move(child_tuple);
+      (*rid_batch) = std::move(child_rid);
+      break;
+
+    } else {
+      for (size_t i{0}; i < child_tuple.size(); i++) {
+        if (num_tuples + 1 <= plan_->GetLimit()) {
+          tuple_batch->push_back(child_tuple[i]);
+          rid_batch->push_back(child_rid[i]);
+          num_tuples++;
+        } else {
+          is_finished = true;
+          return !tuple_batch->empty();
+        }
+      }
+    }
+    child_tuple.clear();
+    child_rid.clear();
+  }
+  is_finished = (num_tuples == plan_->GetLimit()) || tuple_batch->empty();
+  return !tuple_batch->empty();
 }
 
 }  // namespace bustub

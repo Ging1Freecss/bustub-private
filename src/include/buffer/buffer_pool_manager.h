@@ -128,15 +128,14 @@ class BufferPoolManager {
   void FlushAllPagesUnsafe();
   void FlushAllPages();
   auto GetPinCount(page_id_t page_id) -> std::optional<size_t>;
- 
 
  private:
   /** @brief helper function for CheckedWritePage and CheckedReadPage to fetch page*/
-  auto FetchPage(page_id_t page_id, AccessType access_type) -> std::shared_ptr<FrameHeader>; 
+  auto FetchPage(page_id_t page_id, AccessType access_type) -> std::shared_ptr<FrameHeader>;
 
   /** @brief find victim for new page function*/
   auto ClaimFrame() -> std::optional<frame_id_t>;
-  
+
   /** @brief The number of frames in the buffer pool. */
   const size_t num_frames_;
 

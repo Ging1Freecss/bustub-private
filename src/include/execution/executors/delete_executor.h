@@ -46,5 +46,8 @@ class DeleteExecutor : public AbstractExecutor {
 
   /** The child executor from which RIDs for deleted tuples are pulled */
   std::unique_ptr<AbstractExecutor> child_executor_;
+
+  std::shared_ptr<TableInfo> table_info_;
+  bool is_finished{false};
 };
 }  // namespace bustub

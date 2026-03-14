@@ -73,8 +73,9 @@ class LRUKReplacer {
   auto Remove(frame_id_t frame_id) -> bool;
 
   auto Size() -> size_t;
-   
+
   auto UnsafeRemove(frame_id_t frame_id) -> bool;
+
  private:
   // TODO(student): implement me! You can replace these member variables as you like.
   // Remove maybe_unused if you start using them.

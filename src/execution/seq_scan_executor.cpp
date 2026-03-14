@@ -11,7 +11,11 @@
 //===----------------------------------------------------------------------===//
 
 #include "execution/executors/seq_scan_executor.h"
+#include <memory>
+#include "catalog/catalog.h"
+#include "catalog/schema.h"
 #include "common/macros.h"
+#include "storage/table/table_iterator.h"
 
 namespace bustub {
 
@@ -20,12 +24,17 @@ namespace bustub {
  * @param exec_ctx The executor context
  * @param plan The sequential scan plan to be executed
  */
-SeqScanExecutor::SeqScanExecutor(ExecutorContext *exec_ctx, const SeqScanPlanNode *plan) : AbstractExecutor(exec_ctx) {
-  UNIMPLEMENTED("TODO(P3): Add implementation.");
-}
+SeqScanExecutor::SeqScanExecutor(ExecutorContext *exec_ctx, const SeqScanPlanNode *plan)
+    : AbstractExecutor(exec_ctx), plan_(plan) {}
 
 /** Initialize the sequential scan */
-void SeqScanExecutor::Init() { UNIMPLEMENTED("TODO(P3): Add implementation."); }
+void SeqScanExecutor::Init() {
+  // get the table iterator
+  table_oid_t table_oid{plan_->table_oid_};
+  std::shared_ptr<TableInfo> table_info_ptr{exec_ctx_->GetCatalog()->GetTable(table_oid)};
+
+  table_itr_ = std::make_unique<TableIterator>(table_info_ptr->table_->MakeIterator());
+}
 
 /**
  * Yield the next tuple batch from the seq scan.
@@ -36,7 +45,34 @@ void SeqScanExecutor::Init() { UNIMPLEMENTED("TODO(P3): Add implementation."); }
  */
 auto SeqScanExecutor::Next(std::vector<bustub::Tuple> *tuple_batch, std::vector<bustub::RID> *rid_batch,
                            size_t batch_size) -> bool {
-  UNIMPLEMENTED("TODO(P3): Add implementation.");
+  tuple_batch->clear();
+  rid_batch->clear();
+  if (table_itr_->IsEnd()) {
+    return false;
+  }
+  const Schema &schema{plan_->OutputSchema()};
+
+  while (!table_itr_->IsEnd() && tuple_batch->size() < batch_size) {
+    auto [tuple_meta, tuple_data] = table_itr_->GetTuple();
+    RID rid{table_itr_->GetRID()};
+    bool insert_tuple{true};
+
+    if (plan_->filter_predicate_ != nullptr && !tuple_meta.is_deleted_) {  // when "where" clause is used in sql lang
+      Value filter_op{plan_->filter_predicate_->Evaluate(&tuple_data, schema)};
+
+      if (filter_op.IsNull() || !filter_op.GetAs<bool>()) {  // check if filter happen
+        insert_tuple = false;
+      }
+    }
+
+    if (!tuple_meta.is_deleted_ && insert_tuple) {
+      tuple_batch->push_back(tuple_data);
+      rid_batch->push_back(rid);
+    }
+    ++(*table_itr_);
+  }
+
+  return !tuple_batch->empty();
 }
 
 }  // namespace bustub

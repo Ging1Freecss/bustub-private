@@ -12,12 +12,15 @@
 
 #pragma once
 
+#include <cstddef>
+#include <optional>
 #include <vector>
 
 #include "common/rid.h"
 #include "execution/executor_context.h"
 #include "execution/executors/abstract_executor.h"
 #include "execution/plans/index_scan_plan.h"
+#include "storage/index/b_plus_tree_index.h"
 #include "storage/table/tuple.h"
 
 namespace bustub {
@@ -39,6 +42,16 @@ class IndexScanExecutor : public AbstractExecutor {
 
  private:
   /** The index scan plan node to be executed. */
-  const IndexScanPlanNode *plan_;
+  const IndexScanPlanNode *plan_{nullptr};
+
+  std::shared_ptr<TableInfo> table_info_{nullptr};
+  std::shared_ptr<IndexInfo> index_info_{nullptr};
+
+  BPlusTreeIndexForTwoIntegerColumn *tree_{nullptr};
+  BPlusTreeIndexIteratorForTwoIntegerColumn iter_{};
+
+  std::vector<bustub::RID> rids_{};
+  std::size_t rid_idx_{0};
+  bool is_finished{false};
 };
 }  // namespace bustub

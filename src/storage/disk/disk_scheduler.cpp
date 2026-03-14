@@ -82,14 +82,11 @@ void DiskScheduler::StartWorkerThread() {
       auto &[is_write_, data_, page_id_, callback_] = arg.value();
 
       try {
-        switch (is_write_) {
-          case true:
-            this->disk_manager_->WritePage(page_id_, data_);
-            break;
+        if (is_write_) {
+          this->disk_manager_->WritePage(page_id_, data_);
 
-          case false:
-            this->disk_manager_->ReadPage(page_id_, data_);
-            break;
+        } else {
+          this->disk_manager_->ReadPage(page_id_, data_);
         }
       } catch (...) {
         callback_.set_value(false);

@@ -32,15 +32,38 @@ namespace bustub {
 FULL_INDEX_TEMPLATE_ARGUMENTS_DEFN
 class IndexIterator {
  public:
-  using LeafPage = BPlusTreeLeafPage<KeyType, ValueType, KeyComparator,NumTombs>;
+  using LeafPage = BPlusTreeLeafPage<KeyType, ValueType, KeyComparator, NumTombs>;
   // you may define your own constructor based on your member variables
   IndexIterator(std::shared_ptr<TracedBufferPoolManager> bpm, page_id_t current_pid,
                 std::optional<ReadPageGuard> &&read_lk, int index_ = 0);
+  IndexIterator() = default;
+
   ~IndexIterator();  // NOLINT
 
+  // delete copy semantics
+  IndexIterator(const IndexIterator &) = delete;
+  IndexIterator &operator=(const IndexIterator &) = delete;
+
+  // move semantics
+  IndexIterator(IndexIterator &&other) noexcept
+      : bpm_{std::exchange(other.bpm_, nullptr)},
+        current_pid_{std::exchange(other.current_pid_, INVALID_PAGE_ID)},
+        read_lk_{std::exchange(other.read_lk_, std::nullopt)},
+        index{std::exchange(other.index, 0)} {}
+
+  IndexIterator &operator=(IndexIterator &&other) noexcept {
+    if (this != &other) {
+      this->~IndexIterator();
+      bpm_ = std::exchange(other.bpm_, nullptr);
+      current_pid_ = std::exchange(other.current_pid_, INVALID_PAGE_ID);
+      read_lk_ = std::exchange(other.read_lk_, std::nullopt);
+      index = std::exchange(other.index, 0);
+    }
+    return (*this);
+  }
   auto IsEnd() -> bool;
 
-  auto operator*() -> std::pair<const KeyType , const ValueType >;
+  auto operator*() -> std::pair<const KeyType, const ValueType>;
 
   auto operator++() -> IndexIterator &;
 

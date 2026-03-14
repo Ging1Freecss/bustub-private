@@ -357,7 +357,7 @@ TEST(BufferPoolManagerTest, DeadlockTest) {
   child.join();
 }
 
-TEST(BufferPoolManagerTest,EvictableTest) {
+TEST(BufferPoolManagerTest, EvictableTest) {
   // Test if the evictable status of a frame is always correct.
   const size_t rounds = 1000;
   const size_t num_readers = 8;

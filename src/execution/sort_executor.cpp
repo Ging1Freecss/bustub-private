@@ -35,6 +35,8 @@ void SortExecutor::Init() { throw NotImplementedException("SortExecutor is not i
  */
 auto SortExecutor::Next(std::vector<bustub::Tuple> *tuple_batch, std::vector<bustub::RID> *rid_batch, size_t batch_size)
     -> bool {
+  tuple_batch->clear();
+  rid_batch->clear();
   return false;
 }
 

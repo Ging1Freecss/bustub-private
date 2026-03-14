@@ -141,6 +141,7 @@ auto BufferPoolManager::ClaimFrame() -> std::optional<frame_id_t> {
     }
 
     page_table_.erase(victim_ptr->page_id_);
+    victim_ptr->page_id_ = INVALID_PAGE_ID;
   }
   return opt_fid;
 }
@@ -269,10 +270,12 @@ auto BufferPoolManager::FetchPage(page_id_t page_id, AccessType access_type) -> 
       input.push_back(std::move(disk_rq));
       disk_scheduler_->Schedule(input);
 
-      if (!fr.get())
-        return nullptr;  // important to not delete {pageid,frameid} from page_table,as writing to disk failed so we
-                         // still need it
-
+      bool status = fr.get();
+      if (!status) {
+        fprintf(stderr, "DEBUG: CRITICAL! Disk write failed for page %d\n", victim_ptr->page_id_);
+        return nullptr;
+      }
+      // fprintf(stderr, "DEBUG: Flushed dirty page %d during eviction\n", victim_ptr->page_id_);
       victim_ptr->is_dirty_ = false;
     }
     page_table_.erase(victim_ptr->page_id_);  // since we evict the frame

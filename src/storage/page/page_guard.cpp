@@ -173,9 +173,7 @@ void ReadPageGuard::Drop() {
   frame_->rwlatch_.unlock_shared();
   std::scoped_lock<std::mutex> lk_bpm{*bpm_latch_};
 
-  frame_->pin_count_.fetch_sub(1);
-
-  if (frame_->pin_count_ == 0) {
+  if (frame_->pin_count_.fetch_sub(1) == 1) {
     replacer_->SetEvictable(frame_->frame_id_, true);
   }
 
@@ -356,9 +354,7 @@ void WritePageGuard::Drop() {
   frame_->rwlatch_.unlock();
   std::scoped_lock lk{*bpm_latch_};
 
-  frame_->pin_count_.fetch_sub(1);
-
-  if (frame_->pin_count_ == 0) {
+  if (frame_->pin_count_.fetch_sub(1) == 1) {
     replacer_->SetEvictable(frame_->frame_id_, true);
   }
 

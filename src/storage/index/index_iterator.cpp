@@ -37,12 +37,12 @@ FULL_INDEX_TEMPLATE_ARGUMENTS
 auto INDEXITERATOR_TYPE::IsEnd() -> bool { return (current_pid_ == INVALID_PAGE_ID); }
 
 FULL_INDEX_TEMPLATE_ARGUMENTS
-auto INDEXITERATOR_TYPE::operator*() -> std::pair<const KeyType , const ValueType > {
+auto INDEXITERATOR_TYPE::operator*() -> std::pair<const KeyType, const ValueType> {
   const LeafPage *leaf_node{read_lk_->As<LeafPage>()};
   auto key = leaf_node->KeyAt(index);
   auto rid = leaf_node->ValueAt(index);
- 
-  return std::pair<const KeyType , const ValueType >{key, rid};
+
+  return std::pair<const KeyType, const ValueType>{key, rid};
 }
 
 FULL_INDEX_TEMPLATE_ARGUMENTS

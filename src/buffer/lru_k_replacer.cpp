@@ -180,7 +180,7 @@ auto LRUKReplacer::Remove(frame_id_t frame_id) -> bool {
   std::lock_guard lk{latch_};
   auto it = node_store_.find(frame_id);
 
-  if(it == node_store_.end()) return false;
+  if (it == node_store_.end()) return false;
 
   if (!it->second.is_evictable_) return false;
 
@@ -191,7 +191,6 @@ auto LRUKReplacer::Remove(frame_id_t frame_id) -> bool {
 }
 
 auto LRUKReplacer::UnsafeRemove(frame_id_t frame_id) -> bool {
-  
   auto it = node_store_.find(frame_id);
 
   if (it == node_store_.end()) return false;

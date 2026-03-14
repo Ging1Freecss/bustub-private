@@ -47,6 +47,8 @@ autoconf/autom4te.cache
 #==============================================================================#
 #m4/
 build/
+build-release/
+build_support/
 #*.m4
 *.o
 *.lo

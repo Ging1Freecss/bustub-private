@@ -18,7 +18,7 @@
 #include <vector>
 
 #include "common/macros.h"
-#include "common/util/string_util.h"
+// #include "common/util/string_util.h"
 #include "type/abstract_pool.h"
 #include "type/boolean_type.h"
 #include "type/decimal_type.h"

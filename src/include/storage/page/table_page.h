@@ -19,7 +19,7 @@
 
 #include "common/config.h"
 #include "common/rid.h"
-#include "concurrency/lock_manager.h"
+// #include "concurrency/lock_manager.h"
 #include "recovery/log_manager.h"
 #include "storage/page/page.h"
 #include "storage/table/table_heap.h"
