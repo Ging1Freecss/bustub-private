@@ -13,7 +13,10 @@
 #include "execution/executors/index_scan_executor.h"
 #include "catalog/catalog.h"
 #include "common/macros.h"
+#include "concurrency/transaction_manager.h"
+#include "execution/execution_common.h"
 #include "storage/index/b_plus_tree_index.h"
+#include "storage/table/table_heap.h"
 #include "storage/table/tuple.h"
 #include "type/type.h"
 #include "type/type_id.h"
@@ -51,6 +54,10 @@ void IndexScanExecutor::Init() {
     }
     rid_idx_ = 0;
   }
+
+  if (exec_ctx_->GetTransaction()->GetIsolationLevel() == IsolationLevel::SERIALIZABLE) {
+    exec_ctx_->GetTransaction()->AppendScanPredicate(plan_->table_oid_, plan_->filter_predicate_);
+  }
 }
 
 auto IndexScanExecutor::Next(std::vector<bustub::Tuple> *tuple_batch, std::vector<bustub::RID> *rid_batch,
@@ -59,58 +66,87 @@ auto IndexScanExecutor::Next(std::vector<bustub::Tuple> *tuple_batch, std::vecto
   rid_batch->clear();
   if (is_finished) return false;
 
+  const Schema &schema{plan_->OutputSchema()};
+
+  TableHeap *table_heap{table_info_->table_.get()};
+  Transaction *txn{exec_ctx_->GetTransaction()};
+  TransactionManager *txn_mgr{exec_ctx_->GetTransactionManager()};
+
   if (plan_->pred_keys_.empty()) {
     if (iter_.IsEnd()) return false;
 
     while (!iter_.IsEnd() && tuple_batch->size() < batch_size) {
       std::pair<const bustub::GenericKey<8>, const bustub::RID> key_rid{*iter_};
-      auto [meta, tuple] = table_info_->table_->GetTuple(key_rid.second);
+
+      auto [tuple_meta, tuple_data, undo_link] = GetTupleAndUndoLink(txn_mgr, table_heap, key_rid.second);
+
+      std::optional<std::vector<UndoLog>> undo_logs{
+          CollectUndoLogs(key_rid.second, tuple_meta, tuple_data, undo_link, txn, txn_mgr)};
+
+      if (!undo_logs.has_value()) {
+        ++iter_;
+        continue;
+      }
+
+      std::optional<Tuple> tuple_for_curr_txn{ReconstructTuple(&schema, tuple_data, tuple_meta, undo_logs.value())};
+
+      if (!tuple_for_curr_txn.has_value()) {  // if tuple is deleted that case is handle here
+        ++iter_;
+        continue;
+      }
 
       bool insert_tuple{true};
 
       if (plan_->filter_predicate_ != nullptr) {
-        Value filter_allowed{plan_->filter_predicate_->Evaluate(&tuple, table_info_->schema_)};
+        Value filter_allowed{plan_->filter_predicate_->Evaluate(&tuple_for_curr_txn.value(), table_info_->schema_)};
 
         if (filter_allowed.IsNull() || !filter_allowed.GetAs<bool>()) {
           insert_tuple = false;
         }
       }
 
-      if (meta.is_deleted_) {
-        insert_tuple = false;
-      }
-
       if (insert_tuple) {
-        tuple_batch->push_back(tuple);
+        tuple_batch->push_back(tuple_for_curr_txn.value());
         rid_batch->push_back(key_rid.second);
       }
 
       ++iter_;
     }
+
     if (iter_.IsEnd()) {
       is_finished = true;
     }
   } else {
     while (rid_idx_ < rids_.size() && tuple_batch->size() < batch_size) {
-      auto [meta, tuple] = table_info_->table_->GetTuple(rids_[rid_idx_]);
+      auto [tuple_meta, tuple_data, undo_link] = GetTupleAndUndoLink(txn_mgr, table_heap, rids_[rid_idx_]);
+
       rid_idx_++;
+
+      std::optional<std::vector<UndoLog>> undo_logs{
+          CollectUndoLogs(rids_[rid_idx_ - 1], tuple_meta, tuple_data, undo_link, txn, txn_mgr)};
+
+      if (!undo_logs.has_value()) {
+        continue;
+      }
+
+      std::optional<Tuple> tuple_for_curr_txn{ReconstructTuple(&schema, tuple_data, tuple_meta, undo_logs.value())};
+
+      if (!tuple_for_curr_txn.has_value()) {  // if tuple is deleted that case is handle here
+        continue;
+      }
 
       bool insert_tuple{true};
 
       if (plan_->filter_predicate_ != nullptr) {
-        Value filter_allowed{plan_->filter_predicate_->Evaluate(&tuple, table_info_->schema_)};
+        Value filter_allowed{plan_->filter_predicate_->Evaluate(&tuple_for_curr_txn.value(), table_info_->schema_)};
 
         if (filter_allowed.IsNull() || !filter_allowed.GetAs<bool>()) {
           insert_tuple = false;
         }
       }
 
-      if (meta.is_deleted_) {
-        insert_tuple = false;
-      }
-
       if (insert_tuple) {
-        tuple_batch->push_back(tuple);
+        tuple_batch->push_back(tuple_for_curr_txn.value());
         rid_batch->push_back(rids_[rid_idx_ - 1]);
       }
     }

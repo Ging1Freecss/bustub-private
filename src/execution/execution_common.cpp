@@ -13,11 +13,20 @@
 #include "execution/execution_common.h"
 #include <cassert>
 #include <cstddef>
+#include <cstdint>
+#include <optional>
+#include <vector>
 
 #include "binder/bound_order_by.h"
 #include "catalog/catalog.h"
+#include "catalog/schema.h"
+#include "common/config.h"
+#include "common/exception.h"
 #include "common/macros.h"
+#include "common/rid.h"
+#include "concurrency/transaction.h"
 #include "concurrency/transaction_manager.h"
+#include "execution/expressions/comparison_expression.h"
 #include "fmt/core.h"
 #include "storage/table/table_heap.h"
 #include "storage/table/tuple.h"
@@ -99,7 +108,41 @@ auto GenerateSortKey(const Tuple &tuple, const std::vector<OrderBy> &order_bys, 
  */
 auto ReconstructTuple(const Schema *schema, const Tuple &base_tuple, const TupleMeta &base_meta,
                       const std::vector<UndoLog> &undo_logs) -> std::optional<Tuple> {
-  UNIMPLEMENTED("not implemented");
+  std::vector<bustub::Value> values{};
+
+  for (uint32_t i{0}; i < schema->GetColumnCount(); i++) {
+    values.emplace_back(base_tuple.GetValue(schema, i));
+  }
+
+  bool is_deleted{base_meta.is_deleted_};
+
+  for (const auto &log : undo_logs) {
+    is_deleted = log.is_deleted_;
+
+    BUSTUB_ASSERT(log.modified_fields_.size() == schema->GetColumnCount(),
+                  "log.modified_fields_.size() != schema->GetColumnCount()");
+
+    std::vector<uint32_t> attrs{};
+    for (size_t i{0}; i < log.modified_fields_.size(); i++) {
+      if (log.modified_fields_[i]) {
+        attrs.push_back(i);
+      }
+    }
+
+    Schema partial_schema{Schema::CopySchema(schema, attrs)};
+    size_t partial_index{0};
+
+    for (size_t i{0}; i < log.modified_fields_.size(); i++) {
+      if (log.modified_fields_[i]) {
+        values[i] = log.tuple_.GetValue(&partial_schema, partial_index);
+        partial_index++;
+      }
+    }
+  }
+
+  if (is_deleted) return std::nullopt;
+
+  return Tuple{values, schema};
 }
 
 /**
@@ -116,7 +159,44 @@ auto ReconstructTuple(const Schema *schema, const Tuple &base_tuple, const Tuple
  */
 auto CollectUndoLogs(RID rid, const TupleMeta &base_meta, const Tuple &base_tuple, std::optional<UndoLink> undo_link,
                      Transaction *txn, TransactionManager *txn_mgr) -> std::optional<std::vector<UndoLog>> {
-  UNIMPLEMENTED("not implemented");
+  // Base tuple is visible (no undo needed)
+  if (base_meta.ts_ <= txn->GetReadTs() && base_meta.ts_ < TXN_START_ID) {
+    return std::vector<UndoLog>{};
+  }
+
+  // Base tuple was modified by us (the current transaction)
+  if (base_meta.ts_ == txn->GetTransactionTempTs()) {
+    return std::vector<UndoLog>{};
+  }
+
+  if (!undo_link.has_value() || !undo_link->IsValid()) {
+    return std::nullopt;
+  }
+
+  // Base tuple is newer than us or owned by another uncommitted transaction
+
+  std::vector<UndoLog> undo_logs{};
+
+  std::optional<UndoLink> current_link = undo_link;
+
+  while (current_link.has_value() && current_link->IsValid()) {
+    std::optional<UndoLog> current_undo_log{txn_mgr->GetUndoLogOptional(current_link.value())};
+
+    // means we reach end of loop and could not find ts <= read_ts -> there is no tuple this txn can read
+    if (!current_undo_log.has_value()) {
+      break;
+    }
+
+    undo_logs.push_back(current_undo_log.value());
+
+    if (current_undo_log->ts_ <= txn->GetReadTs()) {
+      return undo_logs;
+    }
+
+    current_link = current_undo_log->prev_version_;
+  }
+
+  return std::nullopt;
 }
 
 /**
@@ -132,7 +212,31 @@ auto CollectUndoLogs(RID rid, const TupleMeta &base_meta, const Tuple &base_tupl
  */
 auto GenerateNewUndoLog(const Schema *schema, const Tuple *base_tuple, const Tuple *target_tuple, timestamp_t ts,
                         UndoLink prev_version) -> UndoLog {
-  UNIMPLEMENTED("not implemented");
+  if (base_tuple == nullptr) {
+    // mean it is deleted
+    return UndoLog{true, std::vector<bool>(schema->GetColumnCount(), false), Tuple{}, ts, prev_version};
+  } else if (target_tuple == nullptr) {
+    // target tuple is deleted
+    return UndoLog{false, std::vector<bool>(schema->GetColumnCount(), true), *base_tuple, ts, prev_version};
+  } else if (base_tuple != nullptr && target_tuple != nullptr) {
+    std::vector<bool> modified_fields(schema->GetColumnCount(), false);
+    std::vector<Value> values;
+    std::vector<uint32_t> attrs;
+
+    for (size_t i{0}; i < schema->GetColumnCount(); i++) {
+      if (base_tuple->GetValue(schema, i).CompareExactlyEquals(target_tuple->GetValue(schema, i)) == false) {
+        modified_fields[i] = true;
+        values.push_back(base_tuple->GetValue(schema, i));
+        attrs.push_back(i);
+      }
+    }
+
+    Schema partial_schema{Schema::CopySchema(schema, attrs)};
+    Tuple partial_tuple{values, &partial_schema};
+    return UndoLog{false, modified_fields, partial_tuple, ts, prev_version};
+  }
+
+  throw bustub::Exception("this should never happen base tuple and target tuple both null ptr");
 }
 
 /**
@@ -147,7 +251,221 @@ auto GenerateNewUndoLog(const Schema *schema, const Tuple *base_tuple, const Tup
  */
 auto GenerateUpdatedUndoLog(const Schema *schema, const Tuple *base_tuple, const Tuple *target_tuple,
                             const UndoLog &log) -> UndoLog {
-  UNIMPLEMENTED("not implemented");
+  // means original was deleted , so new undo log is just deleted
+  if (log.is_deleted_) {
+    return UndoLog{true, std::vector<bool>(schema->GetColumnCount(), false), Tuple{}, log.ts_, log.prev_version_};
+  }
+
+  /*
+    If the re-inserted value happens to match the original
+    for some column, it would drop that column from the undo log.
+
+    this is important :
+      if (target_val.CompareExactlyEquals(log_val) == false || log.modified_fields_[i])
+
+    NOT :
+      if (target_val.CompareExactlyEquals(log_val) == false)
+  */
+  if (target_tuple == nullptr && base_tuple != nullptr) {
+    // tuple is deleted so restore to original tuple as every value of tuple is change now
+
+    std::vector<uint32_t> partial_attrs{};
+
+    for (size_t i{0}; i < schema->GetColumnCount(); i++) {
+      if (log.modified_fields_[i]) {
+        partial_attrs.push_back(i);
+      }
+    }
+
+    Schema partial_schema{Schema::CopySchema(schema, partial_attrs)};
+
+    std::vector<Value> values{};
+
+    size_t j{0};
+    for (size_t i{0}; i < log.modified_fields_.size(); i++) {
+      if (log.modified_fields_[i]) {
+        values.push_back(log.tuple_.GetValue(&partial_schema, j));
+        j++;
+      } else {
+        values.push_back(base_tuple->GetValue(schema, i));
+      }
+    }
+
+    Tuple new_log_tuple{values, schema};
+    return UndoLog{log.is_deleted_, std::vector<bool>(schema->GetColumnCount(), true), new_log_tuple, log.ts_,
+                   log.prev_version_};
+  }
+
+  // target tuple is not null so only thing that matter is difference between target tuple and log.tuple
+  if (target_tuple != nullptr && base_tuple == nullptr) {
+    // since base tuple is deleted this mean log.tuple_ is a full tuple, not just difference
+    // so we need to get the difference between log.tuple and target tuple
+
+    std::vector<bool> modified_fields(schema->GetColumnCount(), false);
+    std::vector<uint32_t> attrs{};
+    std::vector<Value> values{};
+
+    for (size_t i{0}; i < schema->GetColumnCount(); i++) {
+      Value target_val{target_tuple->GetValue(schema, i)};
+      Value log_val{log.tuple_.GetValue(schema, i)};
+
+      if (target_val.CompareExactlyEquals(log_val) == false || log.modified_fields_[i]) {
+        modified_fields[i] = true;
+        attrs.push_back(i);
+        values.push_back(log_val);
+      }
+    }
+
+    Schema partial_schema{Schema::CopySchema(schema, attrs)};
+    Tuple new_log_tuple{values, &partial_schema};
+
+    return UndoLog{log.is_deleted_, modified_fields, new_log_tuple, log.ts_, log.prev_version_};
+  }
+
+  if (target_tuple != nullptr && base_tuple != nullptr) {
+    std::vector<uint32_t> partial_attrs{};
+
+    for (size_t i{0}; i < schema->GetColumnCount(); i++) {
+      if (log.modified_fields_[i]) {
+        partial_attrs.push_back(i);
+      }
+    }
+
+    Schema partial_schema{Schema::CopySchema(schema, partial_attrs)};
+
+    std::vector<uint32_t> attrs{};
+    std::vector<Value> values{};
+    std::vector<bool> modified_fields(schema->GetColumnCount(), false);
+    size_t j{0};
+
+    for (size_t i{0}; i < schema->GetColumnCount(); i++) {
+      Value org_val{};
+      Value target_val{target_tuple->GetValue(schema, i)};
+
+      if (log.modified_fields_[i]) {
+        org_val = log.tuple_.GetValue(&partial_schema, j);
+        j++;
+      } else {
+        org_val = base_tuple->GetValue(schema, i);
+      }
+
+      if (target_val.CompareExactlyEquals(org_val) == false || log.modified_fields_[i]) {
+        attrs.push_back(i);
+        values.push_back(org_val);
+        modified_fields[i] = true;
+      }
+    }
+
+    Schema new_log_schema{Schema::CopySchema(schema, attrs)};
+    Tuple new_log_tuple{values, &new_log_schema};
+
+    return UndoLog{log.is_deleted_, modified_fields, new_log_tuple, log.ts_, log.prev_version_};
+  }
+
+  return log;
+}
+
+auto IsWriteWriteConflict(const TupleMeta &meta, Transaction *txn) -> bool {
+  if (meta.ts_ >= TXN_START_ID) {
+    if (meta.ts_ == txn->GetTransactionTempTs())
+      // Self-modification
+      return false;
+    else
+      return true;
+  }
+
+  if (meta.ts_ <= txn->GetReadTs())
+    // visible committed version
+    return false;
+  else
+    // Committed version is newer than our read_ts
+    return true;
+}
+
+auto GenerateEmptyTuple(const Schema *schema) -> Tuple {
+  std::vector<Value> values{};
+  for (const Column &col : schema->GetColumns()) {
+    values.emplace_back(ValueFactory::GetZeroValueByType(col.GetType()));
+  }
+
+  return Tuple{values, schema};
+}
+
+auto version_chain_has_conflict(const RID &rid, const std::vector<std::shared_ptr<bustub::AbstractExpression>> &preds,
+                                const Schema &schema, TableHeap *table_heap, TransactionManager *txn_mgr,
+                                timestamp_t read_ts) -> bool {
+  auto [meta, tuple, undo_link_opt] = GetTupleAndUndoLink(txn_mgr, table_heap, rid);
+
+  Tuple after_tuple = tuple;
+  bool after_deleted = meta.is_deleted_;
+
+  std::optional<UndoLink> link = undo_link_opt;
+
+  while (link.has_value() && link->IsValid()) {
+    auto undo_log_opt{txn_mgr->GetUndoLogOptional(link.value())};
+
+    if (!undo_log_opt.has_value()) {
+      break;
+    }
+
+    UndoLog undo_log = std::move(undo_log_opt.value());
+
+    if (undo_log.ts_ <= read_ts) {
+      break;
+    }
+
+    bool before_deleted = undo_log.is_deleted_;
+    Tuple before_tuple{GenerateEmptyTuple(&schema)};
+
+    if (!before_deleted) {
+      // this fn return nullopt if tuple is deleted, so if before_deleted = true -> nullopt ,
+      auto before_tuple_opt = ReconstructTuple(&schema, after_tuple, meta, std::vector<UndoLog>{undo_log});
+
+      if (before_tuple_opt.has_value()) {
+        before_tuple = before_tuple_opt.value();
+      }
+    }
+
+    if (after_deleted && before_deleted) {
+      continue;
+    } else if (after_deleted && (!before_deleted)) {
+      if (match_any_pred(before_tuple, preds, schema)) {
+        return true;
+      }
+    } else if (!after_deleted && before_deleted) {
+      if (match_any_pred(after_tuple, preds, schema)) {
+        return true;
+      }
+    } else {
+      if (match_any_pred(before_tuple, preds, schema) || match_any_pred(after_tuple, preds, schema)) {
+        return true;
+      }
+    }
+
+    after_tuple = std::move(before_tuple);
+    after_deleted = before_deleted;
+    link = undo_log.prev_version_;
+    meta = TupleMeta{undo_log.ts_, before_deleted};
+  }
+  return false;
+}
+
+auto match_any_pred(const Tuple &tuple, const std::vector<std::shared_ptr<bustub::AbstractExpression>> &preds,
+                    const Schema &schema) -> bool {
+  for (const auto &pred : preds) {
+    //  query do a complete scan -> this tuple is always included
+    if (pred.get() == nullptr) {
+      return true;
+    }
+
+    Value val = pred->Evaluate(&tuple, schema);
+
+    if (!val.IsNull() && val.GetAs<bool>()) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 void TxnMgrDbg(const std::string &info, TransactionManager *txn_mgr, const TableInfo *table_info,

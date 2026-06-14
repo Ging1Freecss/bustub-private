@@ -1,0 +1,11 @@
+--- src/include/execution/executors/window_function_executor.h
++++ src/include/execution/executors/window_function_executor.h
+@@ -173,6 +173,8 @@
+         }
+ 
+         const IntermediateResultPage *page_ptr{page_guard_->As<IntermediateResultPage>()};
+         uint32_t max_slot_num{page_ptr->GetNumTuples()};
++        
++        fprintf(stderr, "DEBUG: constructor idx_=%zu max_slot_num=%u\n", idx_, max_slot_num);
+ 
+         if (max_slot_num > 0) {

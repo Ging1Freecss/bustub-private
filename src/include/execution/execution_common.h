@@ -62,6 +62,17 @@ auto GenerateUpdatedUndoLog(const Schema *schema, const Tuple *base_tuple, const
 void TxnMgrDbg(const std::string &info, TransactionManager *txn_mgr, const TableInfo *table_info,
                TableHeap *table_heap);
 
+auto IsWriteWriteConflict(const TupleMeta &meta, Transaction *txn) -> bool;
+
+auto GenerateEmptyTuple(const Schema *schema) -> Tuple;
+
+auto match_any_pred(const Tuple &tuple, const std::vector<std::shared_ptr<bustub::AbstractExpression>> &preds,
+                    const Schema &schema) -> bool;
+
+auto version_chain_has_conflict(const RID &rid, const std::vector<std::shared_ptr<bustub::AbstractExpression>> &preds,
+                                const Schema &schema, TableHeap *table_heap, TransactionManager *txn_mgr,
+                                timestamp_t read_ts) -> bool;
+
 // TODO(P4): Add new functions as needed... You are likely need to define some more functions.
 //
 // To give you a sense of what can be shared across executors / transaction manager, here are the

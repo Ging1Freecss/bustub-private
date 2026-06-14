@@ -12,6 +12,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <memory>
 #include <vector>
 
@@ -51,5 +52,7 @@ class UpdateExecutor : public AbstractExecutor {
   /** The child executor to obtain value from */
   std::unique_ptr<AbstractExecutor> child_executor_;
   bool is_updated{false};
+  std::vector<Tuple> tuple_batch_child;
+  std::vector<RID> rid_batch_child;
 };
 }  // namespace bustub

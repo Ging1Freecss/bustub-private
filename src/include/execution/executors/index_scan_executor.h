@@ -16,6 +16,7 @@
 #include <optional>
 #include <vector>
 
+#include "catalog/schema.h"
 #include "common/rid.h"
 #include "execution/executor_context.h"
 #include "execution/executors/abstract_executor.h"

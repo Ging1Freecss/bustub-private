@@ -161,4 +161,5 @@ auto GetTupleAndUndoLink(TransactionManager *txn_mgr, TableHeap *table_heap, RID
   return std::make_tuple(meta, tuple, undo_link);
 }
 
+
 }  // namespace bustub
