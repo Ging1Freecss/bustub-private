@@ -66,6 +66,7 @@ auto BPLUSTREE_TYPE::IsEmpty() const -> bool {
 FULL_INDEX_TEMPLATE_ARGUMENTS
 auto BPLUSTREE_TYPE::GetValue(const KeyType &key, std::vector<ValueType> *result) -> bool {
   Context ctx;
+  result->clear();
   std::optional<ReadPageGuard> read_header_lk{bpm_->ReadPage(header_page_id_, AccessType::Lookup)};
   const BPlusTreeHeaderPage *header_node{read_header_lk->As<BPlusTreeHeaderPage>()};
 
@@ -320,7 +321,6 @@ FULL_INDEX_TEMPLATE_ARGUMENTS auto BPLUSTREE_TYPE::FindLeafPessimistic(const Key
 
     if (isSafe) {
       ctx.write_set_.clear();
-      ctx.header_page_.reset();
     }
 
     if (node->IsLeafPage()) {

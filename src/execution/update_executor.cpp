@@ -119,9 +119,6 @@ auto UpdateExecutor::Next(std::vector<bustub::Tuple> *tuple_batch, std::vector<b
 
     // check if primary id is changing
     for (size_t j = 0; j < index_info_arr.size(); j++) {
-      /*
-        dont delete the old key before inserting the new key as prev transaction may need it
-      */
       if (!index_info_arr[j]->is_primary_key_) {
         continue;
       }
@@ -179,6 +176,32 @@ auto UpdateExecutor::Next(std::vector<bustub::Tuple> *tuple_batch, std::vector<b
       */
       if (is_success) {
         txn->AppendWriteSet(plan_->GetTableOid(), rid);
+
+        /*
+          this is for secondary key changes , since secondary keys are not involve in undo logs i.e mvcc
+          safe to delete then insert
+        */
+        for (size_t j = 0; j < index_info_arr.size(); j++) {
+          if (index_info_arr[j]->is_primary_key_) { // imp
+            continue;
+          }
+          Tuple old_key{tuple.KeyFromTuple(*schema, *index_info_arr[j]->index_->GetKeySchema(),
+                                           index_info_arr[j]->index_->GetKeyAttrs())};
+          Tuple new_key{new_tuple.KeyFromTuple(*schema, *index_info_arr[j]->index_->GetKeySchema(),
+                                               index_info_arr[j]->index_->GetKeyAttrs())};
+          bool key_changed = false;
+          const Schema *key_schema{index_info_arr[j]->index_->GetKeySchema()};
+          for (size_t idx{0}; idx < key_schema->GetColumnCount(); idx++) {
+            if (!old_key.GetValue(key_schema, idx).CompareExactlyEquals(new_key.GetValue(key_schema, idx))) {
+              key_changed = true;
+              break;
+            }
+          }
+          if (key_changed) {
+            index_info_arr[j]->index_->DeleteEntry(old_key, rid, txn);
+            index_info_arr[j]->index_->InsertEntry(new_key, rid, txn);
+          }
+        }
 
         update_count++;
       }

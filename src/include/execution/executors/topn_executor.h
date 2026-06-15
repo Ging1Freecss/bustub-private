@@ -35,7 +35,7 @@ class TopNExecutor : public AbstractExecutor {
 
   auto Next(std::vector<bustub::Tuple> *tuple_batch, std::vector<bustub::RID> *rid_batch, size_t batch_size)
       -> bool override;
-  
+
   /** @return The output schema for the TopN */
   auto GetOutputSchema() const -> const Schema & override { return plan_->OutputSchema(); }
 

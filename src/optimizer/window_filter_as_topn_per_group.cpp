@@ -1,4 +1,3 @@
-#include "optimizer/optimizer.h"
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -9,6 +8,7 @@
 #include "execution/plans/filter_plan.h"
 #include "execution/plans/topn_per_group_plan.h"
 #include "execution/plans/window_plan.h"
+#include "optimizer/optimizer.h"
 namespace bustub {
 auto Optimizer::OptimizeWindowFilterAsTopNPerGroup(const AbstractPlanNodeRef &plan) -> AbstractPlanNodeRef {
   std::vector<AbstractPlanNodeRef> children;
@@ -42,7 +42,7 @@ auto Optimizer::OptimizeWindowFilterAsTopNPerGroup(const AbstractPlanNodeRef &pl
       if (window_ptr->window_functions_.size() != 1) {
         return optimized_plan;
       }
-      
+
       if (comparison_ptr != nullptr && window_ptr != nullptr) {
         auto column_ptr = dynamic_cast<const ColumnValueExpression *>(comparison_ptr->GetChildAt(0).get());
         auto constant_ptr = dynamic_cast<const ConstantValueExpression *>(comparison_ptr->GetChildAt(1).get());

@@ -1,0 +1,7 @@
+create table temp_1(colA int, colB int, colC int, colD int);
+insert into temp_1 values (0 , 1, 6113, 48270), (42, 1, 34, 95622);
+create table temp_2(colA int, colB int, colC int);
+insert into temp_2 values (15, 2, 5), (50, 8, 0), (34, 311, 4);
+create index temp_1_colA on temp_1(colA);
+create index temp_2_colA on temp_2(colA);
+explain select * from temp_2 t2 inner join (select distinct(temp_2.colA) from temp_1 inner join temp_2 on temp_1.colC = temp_2.colA) t3 on t2.colB < t3.colA;

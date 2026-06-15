@@ -47,8 +47,43 @@ void AggregationExecutor::Init() {
 
   while (child_executor_->Next(&tuple_batch_child, &rid_batch_child, BUSTUB_BATCH_SIZE)) {
     for (std::size_t i{0}; i < tuple_batch_child.size(); i++) {
-      auto agg_key = MakeAggregateKey(&tuple_batch_child[i]);
-      auto agg_value = MakeAggregateValue(&tuple_batch_child[i]);
+      /*
+      dont do this:
+        auto agg_key = MakeAggregateKey(&tuple_batch_child[i]);
+        auto agg_value = MakeAggregateValue(&tuple_batch_child[i]);
+
+        expr->Evaluate(...) for variable-length types like VARCHAR or VECTOR, the Value object often just holds a
+      pointer to the string data that lives inside the original tuple_batch_child.
+
+      AggregateKey or AggregateValue inside the Hash Table was holding a VARCHAR Value that was just a pointer to the
+      tuple, clearing the tuple_batch_child would instantly destroy the underlying string data. Your Hash Table would
+      now be holding dangling pointers pointing to garbage memory. Later, when CombineAggregateValues or the Hash Table
+      tries to compare those keys, it would crash with a segmentation fault.
+
+      Forcing a Deep Copy
+      */
+      std::vector<Value> group_bys;
+      for (const auto &expr : plan_->GetGroupBys()) {
+        Value val = expr->Evaluate(&tuple_batch_child[i], child_executor_->GetOutputSchema());
+        if (!val.IsNull() && (val.GetTypeId() == TypeId::VARCHAR || val.GetTypeId() == TypeId::VECTOR)) {
+          std::string str = val.ToString();
+          group_bys.emplace_back(ValueFactory::GetVarcharValue(str));
+        } else {
+          group_bys.emplace_back(val);
+        }
+      }
+      AggregateKey agg_key{group_bys};
+      std::vector<Value> vals;
+      for (const auto &expr : plan_->GetAggregates()) {
+        Value val = expr->Evaluate(&tuple_batch_child[i], child_executor_->GetOutputSchema());
+        if (!val.IsNull() && (val.GetTypeId() == TypeId::VARCHAR || val.GetTypeId() == TypeId::VECTOR)) {
+          std::string str = val.ToString();
+          vals.emplace_back(ValueFactory::GetVarcharValue(str));
+        } else {
+          vals.emplace_back(val);
+        }
+      }
+      AggregateValue agg_value{vals};
 
       aht_.InsertCombine(agg_key, agg_value);
     }

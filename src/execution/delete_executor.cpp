@@ -126,15 +126,19 @@ auto DeleteExecutor::Next(std::vector<bustub::Tuple> *tuple_batch, std::vector<b
         txn->AppendWriteSet(table_info_->oid_, tuple_rid);
 
         /*
-          this  in a real database (like Postgres), there's a separate "index vacuum" phase that cleans up dead index
-          entries, but that's outside the scope of this course
+          Unlike primary keys, secondary index entries do not anchor version chains. Leaving them around would bloat the
+          index with useless pointers to deleted tuples and slow down secondary index scans. Therefore, they are cleaned
+          up immediately when a deletion occurs.
         */
-        // for (size_t j = 0; j < index_info_arr.size(); j++) {
-        //   Tuple key{tuple.KeyFromTuple(table_info_->schema_, *index_info_arr[j]->index_->GetKeySchema(),
-        //                                index_info_arr[j]->index_->GetKeyAttrs())};
-
-        //   index_info_arr[j]->index_->DeleteEntry(key, tuple_rid, exec_ctx_->GetTransaction());
-        // }
+        const std::vector<std::shared_ptr<IndexInfo>> &index_info_arr{
+            exec_ctx_->GetCatalog()->GetTableIndexes(table_name)};
+        for (size_t j = 0; j < index_info_arr.size(); j++) {
+          if (!index_info_arr[j]->is_primary_key_) {  // imp
+            Tuple key{tuple.KeyFromTuple(table_info_->schema_, *index_info_arr[j]->index_->GetKeySchema(),
+                                         index_info_arr[j]->index_->GetKeyAttrs())};
+            index_info_arr[j]->index_->DeleteEntry(key, tuple_rid, exec_ctx_->GetTransaction());
+          }
+        }
         delete_count++;
       }
     }

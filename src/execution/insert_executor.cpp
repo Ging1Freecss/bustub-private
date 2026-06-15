@@ -180,8 +180,6 @@ auto InsertExecutor::Next(std::vector<bustub::Tuple> *tuple_batch, std::vector<b
             table_info_ptr->table_->InsertTuple(TupleMeta{txn->GetTransactionTempTs(), false}, tuple_batch_child[i])};
 
         if (rid.has_value()) {
-         
-
           txn->AppendWriteSet(table_oid, rid.value());
           for (int j = 0; j < int(index_info_arr.size()); j++) {
             Tuple tuple_extract{tuple_batch_child[i].KeyFromTuple(child_executor_->GetOutputSchema(),

@@ -1,0 +1,10 @@
+--- src/storage/index/b_plus_tree.cpp
++++ src/storage/index/b_plus_tree.cpp
+@@ -321,7 +321,9 @@
+ 
+     if (isSafe) {
+-      if (!ctx.IsRootPage(page_id)) {
+-        ctx.header_page_.reset();
+-      }
+       ctx.write_set_.clear();
+     }

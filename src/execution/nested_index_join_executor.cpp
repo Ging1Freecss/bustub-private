@@ -15,7 +15,6 @@
 #include "binder/table_ref/bound_join_ref.h"
 #include "catalog/schema.h"
 #include "common/config.h"
-#include "common/macros.h"
 #include "common/rid.h"
 #include "storage/table/tuple.h"
 #include "type/value.h"
@@ -52,6 +51,7 @@ void NestedIndexJoinExecutor::Init() {
   index_info_ = exec_ctx_->GetCatalog()->GetIndex(plan_->GetIndexOid());
 
   child_idx_ = 0;
+  is_finished = false;
   child_exist = child_executor_->Next(&child_tuple_batch_, &rid_batch_child, BUSTUB_BATCH_SIZE);
 }
 

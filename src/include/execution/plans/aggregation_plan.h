@@ -12,7 +12,6 @@
 
 #pragma once
 
-#include <memory>
 #include <string>
 #include <utility>
 #include <vector>
@@ -21,7 +20,6 @@
 #include "execution/expressions/abstract_expression.h"
 #include "execution/plans/abstract_plan.h"
 #include "fmt/format.h"
-#include "storage/table/tuple.h"
 
 namespace bustub {
 
@@ -104,6 +102,9 @@ struct AggregateKey {
    */
   auto operator==(const AggregateKey &other) const -> bool {
     for (uint32_t i = 0; i < other.group_bys_.size(); i++) {
+      if (group_bys_[i].IsNull() && other.group_bys_[i].IsNull()) { // imp
+        continue;
+      }
       if (group_bys_[i].CompareEquals(other.group_bys_[i]) != CmpBool::CmpTrue) {
         return false;
       }
